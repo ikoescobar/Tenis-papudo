@@ -109,6 +109,9 @@ nav button.active{color:var(--clay);border-bottom-color:var(--clay);}
 .filter-btn{background:var(--white);border:1px solid rgba(0,0,0,0.12);padding:5px 13px;border-radius:20px;font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;color:#555;font-weight:500;transition:all 0.15s;}
 .filter-btn.active{background:var(--clay);color:var(--white);border-color:var(--clay);}
 .empty{text-align:center;padding:2.5rem;color:#bbb;font-size:13px;}
+.sheet-link{display:inline-flex;align-items:center;gap:7px;background:var(--white);border:1px solid rgba(0,0,0,0.12);border-radius:8px;padding:9px 16px;font-size:13px;color:var(--clay-dark);font-weight:500;text-decoration:none;margin-bottom:1.4rem;transition:all 0.15s;}
+.sheet-link:hover{background:var(--clay);color:var(--white);border-color:var(--clay);}
+.loading-msg{text-align:center;padding:2.5rem;color:#bbb;font-size:13px;font-style:italic;}
 .player-thumb{width:28px;height:28px;border-radius:50%;object-fit:cover;object-position:center top;margin-right:6px;vertical-align:middle;border:2px solid rgba(255,255,255,0.8);box-shadow:0 1px 4px rgba(0,0,0,0.15);}
 </style>
 </head>
@@ -135,7 +138,7 @@ nav button.active{color:var(--clay);border-bottom-color:var(--clay);}
 </nav>
 <div id="jugadores" class="section active"><div class="section-title">Los jugadores</div><div class="section-line"></div><div class="players-grid" id="players-grid"></div></div>
 <div id="agenda" class="section"><div class="section-title">Agenda</div><div class="section-line"></div><div class="filter-row"><button class="filter-btn active" data-filter="all">Todos</button><button class="filter-btn" data-filter="pending">Pendientes</button><button class="filter-btn" data-filter="done">Jugados</button></div><div class="matches-list" id="matches-list"></div></div>
-<div id="resultados" class="section"><div class="section-title">Resultados</div><div class="section-line"></div><div class="results-list" id="results-list"></div></div>
+<div id="resultados" class="section"><div class="section-title">Resultados</div><div class="section-line"></div><a href="https://docs.google.com/spreadsheets/d/1w0_3Zonu2pK9GIbOpONJrCnmuZaeWeWPpA4SveWZMLQ/edit" target="_blank" class="sheet-link">📊 Ingresar / editar resultados</a><div class="results-list" id="results-list"></div></div>
 <div id="posiciones" class="section"><div class="section-title">Tabla de posiciones</div><div class="section-line"></div>
   <div class="standings-wrap">
     <table class="standings-table">
@@ -165,38 +168,47 @@ const players=[
   {id:6,name:"José Ramón",champ:false,debut:true,bio:"Debutante en el Viña Open. Dicen que viene de la qualy del Chile Open y que casi pasa al cuadro principal. Su nivel es un misterio."}
 ];
 
-const allMatches=[
-  {id:1, p1:"Taqui",        p2:"Iko",           status:"pending"},
-  {id:2, p1:"Taqui",        p2:"Benja Montero",  status:"pending"},
-  {id:3, p1:"Taqui",        p2:"Emiliano",       status:"pending", date:"5 Abr", time:"10:00", venue:"Club Las Condes, Cancha 2"},
-  {id:4, p1:"Taqui",        p2:"Sergio",         status:"pending"},
-  {id:5, p1:"Taqui",        p2:"José Ramón",     status:"pending"},
-  {id:6, p1:"Iko",          p2:"Benja Montero",  status:"pending"},
-  {id:7, p1:"Iko",          p2:"Emiliano",       status:"done", winner:"Iko", score:"6-4 / 6-2", p1sets:2, p2sets:0, p1games:12, p2games:6, date:"16 Mar", time:"21:00", venue:"Youtopia"},
-  {id:8, p1:"Iko",          p2:"Sergio",         status:"pending"},
-  {id:9, p1:"Iko",          p2:"José Ramón",     status:"pending"},
-  {id:10,p1:"Benja Montero",p2:"Emiliano",       status:"pending"},
-  {id:11,p1:"Benja Montero",p2:"Sergio",         status:"pending"},
-  {id:12,p1:"Benja Montero",p2:"José Ramón",     status:"pending"},
-  {id:13,p1:"Emiliano",     p2:"Sergio",         status:"pending"},
-  {id:14,p1:"Emiliano",     p2:"José Ramón",     status:"pending"},
-  {id:15,p1:"Sergio",       p2:"José Ramón",     status:"suspended", date:"2 Abr", time:"20:00", venue:"Estadio Español, Cancha 6"},
-  {id:16,p1:"Iko",          p2:"Taqui",          status:"pending"},
-  {id:17,p1:"Benja Montero",p2:"Taqui",          status:"pending"},
-  {id:18,p1:"Emiliano",     p2:"Taqui",          status:"pending"},
-  {id:19,p1:"Sergio",       p2:"Taqui",          status:"pending"},
-  {id:20,p1:"José Ramón",   p2:"Taqui",          status:"pending"},
-  {id:21,p1:"Benja Montero",p2:"Iko",            status:"pending"},
-  {id:22,p1:"Emiliano",     p2:"Iko",            status:"done", winner:"Emiliano", score:"6-3 / 7-6", p1sets:2, p2sets:0, p1games:12, p2games:9, date:"3 Abr", time:"11:00", venue:"Pato Cornejo, Cancha 2"},
-  {id:23,p1:"Sergio",       p2:"Iko",            status:"pending"},
-  {id:24,p1:"José Ramón",   p2:"Iko",            status:"pending"},
-  {id:25,p1:"Emiliano",     p2:"Benja Montero",  status:"pending"},
-  {id:26,p1:"Sergio",       p2:"Benja Montero",  status:"pending"},
-  {id:27,p1:"José Ramón",   p2:"Benja Montero",  status:"pending"},
-  {id:28,p1:"Sergio",       p2:"Emiliano",       status:"pending"},
-  {id:29,p1:"José Ramón",   p2:"Emiliano",       status:"pending"},
-  {id:30,p1:"José Ramón",   p2:"Sergio",         status:"pending"}
-];
+let allMatches=[];
+
+const SHEET_ID='1w0_3Zonu2pK9GIbOpONJrCnmuZaeWeWPpA4SveWZMLQ';
+const SHEET_URL=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/pub?output=csv`;
+
+function parseCSVLine(line){
+  const r=[];let cur='',inQ=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){inQ=!inQ;}
+    else if(ch===','&&!inQ){r.push(cur);cur='';}
+    else{cur+=ch;}
+  }
+  r.push(cur);return r;
+}
+
+async function loadFromSheet(){
+  try{
+    const res=await fetch(SHEET_URL);
+    const text=await res.text();
+    const lines=text.trim().split('\n');
+    allMatches=lines.slice(1).map(line=>{
+      const c=parseCSVLine(line);
+      if(!c[0]||!c[0].trim()) return null;
+      const n=v=>v&&v.trim()!==''?parseInt(v):null;
+      return{
+        id:parseInt(c[0]),
+        p1:(c[1]||'').trim(),
+        p2:(c[2]||'').trim(),
+        status:(c[3]||'').trim()||'pending',
+        winner:(c[4]||'').trim()||null,
+        score:(c[5]||'').trim()||null,
+        p1sets:n(c[6]),p2sets:n(c[7]),
+        p1games:n(c[8]),p2games:n(c[9]),
+        date:(c[10]||'').trim()||null,
+        time:(c[11]||'').trim()||null,
+        venue:(c[12]||'').trim()||null
+      };
+    }).filter(Boolean);
+  }catch(e){console.error('Error cargando planilla:',e);}
+}
 
 const basesData=[
   {num:"1",title:"Duración del campeonato",rules:[{l:"a",t:"El campeonato se desarrollará durante el año <strong>2026</strong>."},{l:"b",t:"Inicio en <strong>marzo 2026</strong>. La fase regular cierra el <strong>domingo 30 de agosto de 2026</strong>."},{l:"c",t:"La <strong>final</strong> se jugará en septiembre de 2026."}]},
@@ -403,7 +415,13 @@ document.addEventListener('click',e=>{
   renderMatches(fb.dataset.filter);
 });
 
-renderPlayers();renderMatches();renderResults();renderStandings();renderPrizes();renderBases();
+renderPlayers();renderPrizes();renderBases();
+document.getElementById('results-list').innerHTML='<div class="loading-msg">Cargando resultados...</div>';
+document.getElementById('matches-list').innerHTML='<div class="loading-msg">Cargando partidos...</div>';
+(async()=>{
+  await loadFromSheet();
+  renderMatches();renderResults();renderStandings();
+})();
 </script>
 </body>
 </html>
