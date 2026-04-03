@@ -184,28 +184,55 @@ function parseCSVLine(line){
   r.push(cur);return r;
 }
 
+// Parse "6-4" → {a:6, b:4}  (a = p1 games, b = p2 games)
+function parseSet(s){
+  if(!s||!s.trim()) return null;
+  const p=s.trim().split('-');
+  if(p.length!==2) return null;
+  const a=parseInt(p[0]),b=parseInt(p[1]);
+  return(isNaN(a)||isNaN(b))?null:{a,b};
+}
+
+// Given raw row from sheet, calculate winner/score/sets/games
+function processMatch(raw){
+  if(raw.status!=='done')
+    return{...raw,winner:null,score:null,p1sets:null,p2sets:null,p1games:null,p2games:null};
+  const s1=parseSet(raw.set1), s2=parseSet(raw.set2), tb=parseSet(raw.supertb);
+  if(!s1||!s2)
+    return{...raw,winner:null,score:null,p1sets:null,p2sets:null,p1games:null,p2games:null};
+  const p1sets=(s1.a>s1.b?1:0)+(s2.a>s2.b?1:0);
+  const p2sets=(s1.b>s1.a?1:0)+(s2.b>s2.a?1:0);
+  let p1games=s1.a+s2.a, p2games=s1.b+s2.b, winner;
+  if(tb){
+    // super tiebreak — count tb points as games, winner decided by tb
+    p1games+=tb.a; p2games+=tb.b;
+    winner=tb.a>tb.b?raw.p1:raw.p2;
+  } else {
+    winner=p1sets>=2?raw.p1:raw.p2;
+  }
+  const score=tb?`${raw.set1} / ${raw.set2} / ${raw.supertb}`:`${raw.set1} / ${raw.set2}`;
+  return{...raw,winner,score,p1sets,p2sets,p1games,p2games};
+}
+
 async function loadFromSheet(){
   try{
     const res=await fetch(SHEET_URL);
     const text=await res.text();
     const lines=text.trim().split('\n');
+    // Read headers from row 1, look up columns by name (order doesn't matter)
+    const headers=parseCSVLine(lines[0]).map(h=>h.trim().toLowerCase());
+    const col=h=>headers.indexOf(h);
     allMatches=lines.slice(1).map(line=>{
       const c=parseCSVLine(line);
-      if(!c[0]||!c[0].trim()) return null;
-      const n=v=>v&&v.trim()!==''?parseInt(v):null;
-      return{
-        id:parseInt(c[0]),
-        p1:(c[1]||'').trim(),
-        p2:(c[2]||'').trim(),
-        status:(c[3]||'').trim()||'pending',
-        winner:(c[4]||'').trim()||null,
-        score:(c[5]||'').trim()||null,
-        p1sets:n(c[6]),p2sets:n(c[7]),
-        p1games:n(c[8]),p2games:n(c[9]),
-        date:(c[10]||'').trim()||null,
-        time:(c[11]||'').trim()||null,
-        venue:(c[12]||'').trim()||null
-      };
+      const g=h=>{const i=col(h);return i>=0?(c[i]||'').trim():''};
+      if(!g('id')) return null;
+      return processMatch({
+        id:parseInt(g('id')),
+        p1:g('p1'), p2:g('p2'),
+        status:g('status')||'pending',
+        set1:g('set1'), set2:g('set2'), supertb:g('supertb'),
+        date:g('date')||null, time:g('time')||null, venue:g('venue')||null
+      });
     }).filter(Boolean);
   }catch(e){console.error('Error cargando planilla:',e);}
 }
