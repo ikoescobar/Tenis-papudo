@@ -111,6 +111,9 @@ nav button.active{color:var(--clay);border-bottom-color:var(--clay);}
 .empty{text-align:center;padding:2.5rem;color:#bbb;font-size:13px;}
 .sheet-link{display:inline-flex;align-items:center;gap:7px;background:var(--white);border:1px solid rgba(0,0,0,0.12);border-radius:8px;padding:9px 16px;font-size:13px;color:var(--clay-dark);font-weight:500;text-decoration:none;margin-bottom:1.4rem;transition:all 0.15s;}
 .sheet-link:hover{background:var(--clay);color:var(--white);border-color:var(--clay);}
+.refresh-btn{background:none;border:1px solid rgba(0,0,0,0.12);border-radius:8px;padding:9px 16px;font-size:13px;color:#888;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+.refresh-btn:hover{border-color:var(--clay);color:var(--clay);}
+.refresh-btn.spinning{opacity:0.5;pointer-events:none;}
 .loading-msg{text-align:center;padding:2.5rem;color:#bbb;font-size:13px;font-style:italic;}
 .player-thumb{width:28px;height:28px;border-radius:50%;object-fit:cover;object-position:center top;margin-right:6px;vertical-align:middle;border:2px solid rgba(255,255,255,0.8);box-shadow:0 1px 4px rgba(0,0,0,0.15);}
 </style>
@@ -138,7 +141,11 @@ nav button.active{color:var(--clay);border-bottom-color:var(--clay);}
 </nav>
 <div id="jugadores" class="section active"><div class="section-title">Los jugadores</div><div class="section-line"></div><div class="players-grid" id="players-grid"></div></div>
 <div id="agenda" class="section"><div class="section-title">Agenda</div><div class="section-line"></div><div class="filter-row"><button class="filter-btn active" data-filter="all">Todos</button><button class="filter-btn" data-filter="pending">Pendientes</button><button class="filter-btn" data-filter="done">Jugados</button></div><div class="matches-list" id="matches-list"></div></div>
-<div id="resultados" class="section"><div class="section-title">Resultados</div><div class="section-line"></div><a href="https://docs.google.com/spreadsheets/d/1w0_3Zonu2pK9GIbOpONJrCnmuZaeWeWPpA4SveWZMLQ/edit" target="_blank" class="sheet-link">📊 Ingresar / editar resultados</a><div class="results-list" id="results-list"></div></div>
+<div id="resultados" class="section"><div class="section-title">Resultados</div><div class="section-line"></div><div style="display:flex;gap:8px;align-items:center;margin-bottom:1.4rem;flex-wrap:wrap;">
+<a href="https://docs.google.com/spreadsheets/d/1w0_3Zonu2pK9GIbOpONJrCnmuZaeWeWPpA4SveWZMLQ/edit" target="_blank" class="sheet-link" style="margin-bottom:0">📊 Ingresar / editar resultados</a>
+<button class="refresh-btn" id="refresh-btn" onclick="refreshData()">↻ Actualizar</button>
+</div>
+<div class="results-list" id="results-list"></div></div>
 <div id="posiciones" class="section"><div class="section-title">Tabla de posiciones</div><div class="section-line"></div>
   <div class="standings-wrap">
     <table class="standings-table">
@@ -440,6 +447,14 @@ document.addEventListener('click',e=>{
   fb.classList.add('active');
   renderMatches(fb.dataset.filter);
 });
+
+async function refreshData(){
+  const btn=document.getElementById('refresh-btn');
+  btn.classList.add('spinning');btn.textContent='↻ Actualizando...';
+  await loadFromSheet();
+  renderMatches();renderResults();renderStandings();
+  btn.classList.remove('spinning');btn.textContent='↻ Actualizar';
+}
 
 renderPlayers();renderPrizes();renderBases();
 document.getElementById('results-list').innerHTML='<div class="loading-msg">Cargando resultados...</div>';
