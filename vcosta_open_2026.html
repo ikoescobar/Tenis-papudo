@@ -457,28 +457,32 @@ document.addEventListener('click',e=>{
 function renderStats(){
   const done=allMatches.filter(m=>m.status==='done');
   const pending=allMatches.filter(m=>m.status==='pending').length;
-  const totalMatches=allMatches.length;
-  let sets=0,games=0;
+  let sets=0,games=0,tbs=0;
   done.forEach(m=>{
-    const s=(m.p1sets||0)+(m.p2sets||0)+(m.supertb?1:0);
-    sets+=s;
+    sets+=(m.p1sets||0)+(m.p2sets||0)+(m.supertb?1:0);
     games+=(m.p1games||0)+(m.p2games||0);
+    if(m.supertb) tbs++;
   });
   document.getElementById('result-stats').innerHTML=`
     <div class="result-stat">
       <div class="result-stat-num">${done.length}</div>
       <div class="result-stat-sub">faltan ${pending}</div>
-      <div class="result-stat-label">Partidos</div>
+      <div class="result-stat-label">Partidos jugados</div>
     </div>
     <div class="result-stat">
       <div class="result-stat-num">${sets}</div>
       <div class="result-stat-sub">&nbsp;</div>
-      <div class="result-stat-label">Sets</div>
+      <div class="result-stat-label">Sets jugados</div>
     </div>
     <div class="result-stat">
       <div class="result-stat-num">${games}</div>
       <div class="result-stat-sub">&nbsp;</div>
-      <div class="result-stat-label">Games</div>
+      <div class="result-stat-label">Juegos jugados</div>
+    </div>
+    <div class="result-stat">
+      <div class="result-stat-num">${tbs}</div>
+      <div class="result-stat-sub">&nbsp;</div>
+      <div class="result-stat-label">Super Tiebreaks</div>
     </div>`;
 }
 
