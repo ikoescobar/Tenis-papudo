@@ -111,6 +111,11 @@ nav button.active{color:var(--clay);border-bottom-color:var(--clay);}
 .empty{text-align:center;padding:2.5rem;color:#bbb;font-size:13px;}
 .sheet-link{display:inline-flex;align-items:center;gap:7px;background:var(--white);border:1px solid rgba(0,0,0,0.12);border-radius:8px;padding:9px 16px;font-size:13px;color:var(--clay-dark);font-weight:500;text-decoration:none;margin-bottom:1.4rem;transition:all 0.15s;}
 .sheet-link:hover{background:var(--clay);color:var(--white);border-color:var(--clay);}
+.result-stats{display:flex;gap:12px;margin-bottom:1.4rem;flex-wrap:wrap;}
+.result-stat{background:var(--white);border:1px solid rgba(0,0,0,0.07);border-radius:10px;padding:10px 16px;flex:1;min-width:90px;text-align:center;}
+.result-stat-num{font-family:'Bebas Neue',cursive;font-size:1.6rem;color:var(--clay);line-height:1;}
+.result-stat-sub{font-size:10px;color:#bbb;margin-top:1px;}
+.result-stat-label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:4px;font-weight:500;}
 .refresh-btn{background:none;border:1px solid rgba(0,0,0,0.12);border-radius:8px;padding:9px 16px;font-size:13px;color:#888;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
 .refresh-btn:hover{border-color:var(--clay);color:var(--clay);}
 .refresh-btn.spinning{opacity:0.5;pointer-events:none;}
@@ -141,7 +146,8 @@ nav button.active{color:var(--clay);border-bottom-color:var(--clay);}
 </nav>
 <div id="jugadores" class="section active"><div class="section-title">Los jugadores</div><div class="section-line"></div><div class="players-grid" id="players-grid"></div></div>
 <div id="agenda" class="section"><div class="section-title">Agenda</div><div class="section-line"></div><div class="filter-row"><button class="filter-btn active" data-filter="all">Todos</button><button class="filter-btn" data-filter="pending">Pendientes</button><button class="filter-btn" data-filter="done">Jugados</button></div><div class="matches-list" id="matches-list"></div></div>
-<div id="resultados" class="section"><div class="section-title">Resultados</div><div class="section-line"></div><div style="display:flex;gap:8px;align-items:center;margin-bottom:1.4rem;flex-wrap:wrap;">
+<div id="resultados" class="section"><div class="section-title">Resultados</div><div class="section-line"></div><div id="result-stats" class="result-stats"></div>
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:1.4rem;flex-wrap:wrap;">
 <a href="https://docs.google.com/spreadsheets/d/1w0_3Zonu2pK9GIbOpONJrCnmuZaeWeWPpA4SveWZMLQ/edit" target="_blank" class="sheet-link" style="margin-bottom:0">📊 Ingresar / editar resultados</a>
 <button class="refresh-btn" id="refresh-btn" onclick="refreshData()">↻ Actualizar</button>
 </div>
@@ -448,11 +454,39 @@ document.addEventListener('click',e=>{
   renderMatches(fb.dataset.filter);
 });
 
+function renderStats(){
+  const done=allMatches.filter(m=>m.status==='done');
+  const pending=allMatches.filter(m=>m.status==='pending').length;
+  const totalMatches=allMatches.length;
+  let sets=0,games=0;
+  done.forEach(m=>{
+    const s=(m.p1sets||0)+(m.p2sets||0)+(m.supertb?1:0);
+    sets+=s;
+    games+=(m.p1games||0)+(m.p2games||0);
+  });
+  document.getElementById('result-stats').innerHTML=`
+    <div class="result-stat">
+      <div class="result-stat-num">${done.length}</div>
+      <div class="result-stat-sub">faltan ${pending}</div>
+      <div class="result-stat-label">Partidos</div>
+    </div>
+    <div class="result-stat">
+      <div class="result-stat-num">${sets}</div>
+      <div class="result-stat-sub">&nbsp;</div>
+      <div class="result-stat-label">Sets</div>
+    </div>
+    <div class="result-stat">
+      <div class="result-stat-num">${games}</div>
+      <div class="result-stat-sub">&nbsp;</div>
+      <div class="result-stat-label">Games</div>
+    </div>`;
+}
+
 async function refreshData(){
   const btn=document.getElementById('refresh-btn');
   btn.classList.add('spinning');btn.textContent='↻ Actualizando...';
   await loadFromSheet();
-  renderMatches();renderResults();renderStandings();
+  renderMatches();renderResults();renderStandings();renderStats();
   btn.classList.remove('spinning');btn.textContent='↻ Actualizar';
 }
 
@@ -461,7 +495,7 @@ document.getElementById('results-list').innerHTML='<div class="loading-msg">Carg
 document.getElementById('matches-list').innerHTML='<div class="loading-msg">Cargando partidos...</div>';
 (async()=>{
   await loadFromSheet();
-  renderMatches();renderResults();renderStandings();
+  renderMatches();renderResults();renderStandings();renderStats();
 })();
 </script>
 </body>
