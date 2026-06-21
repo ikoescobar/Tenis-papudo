@@ -228,7 +228,7 @@ function processMatch(raw){
 
 async function loadFromSheet(){
   try{
-    const res=await fetch(SHEET_URL);
+    const res=await fetch(SHEET_URL+'&t='+Date.now(),{cache:'no-store'});
     const text=await res.text();
     const lines=text.trim().split('\n');
     // Read headers from row 1, look up columns by name (order doesn't matter)
