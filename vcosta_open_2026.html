@@ -159,7 +159,7 @@ nav button.active{color:var(--clay);border-bottom-color:var(--clay);}
         <th>#</th><th>Jugador</th><th>PJ</th><th>PG</th><th>PP</th>
         <th>Sets G</th><th>Sets P</th><th>Dif Sets</th>
         <th class="col-highlight">J. G</th><th class="col-highlight">J. P</th><th class="col-highlight">Dif J.</th>
-        <th>Pts</th>
+        <th>Sanciones</th><th>Pts</th>
       </tr></thead>
       <tbody id="standings-body"></tbody>
     </table>
@@ -185,6 +185,18 @@ let allMatches=[];
 
 const SHEET_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRaAGwO2g4MemOtRHS4mhYn8nBTEMA5ot27PNm-H-UjmwAA7U6j6PVOFvAq4xQFLQCtbG0VfxtqvR60/pub?gid=0&single=true&output=csv';
 
+// Pestaña "excusas" — matriz jugador x mes con checkbox "excusado".
+// Pegar acá la URL publicada de esa pestaña (Archivo > Compartir > Publicar en la web,
+// eligiendo la hoja "excusas", formato CSV). Mientras quede vacío, no se aplica ninguna
+// sanción por inactividad mensual.
+const SHEET_URL_EXCUSAS='https://docs.google.com/spreadsheets/d/e/2PACX-1vRaAGwO2g4MemOtRHS4mhYn8nBTEMA5ot27PNm-H-UjmwAA7U6j6PVOFvAq4xQFLQCtbG0VfxtqvR60/pub?gid=1472500804&single=true&output=csv';
+
+const MONTHS_2026=[
+  {abbr:'Mar',num:3},{abbr:'Abr',num:4},{abbr:'May',num:5},
+  {abbr:'Jun',num:6},{abbr:'Jul',num:7},{abbr:'Ago',num:8}
+];
+let excusasData={}; // {jugador: {Mar:true, Abr:false, ...}}
+
 function parseCSVLine(line){
   const r=[];let cur='',inQ=false;
   for(let i=0;i<line.length;i++){
@@ -208,14 +220,22 @@ function parseSet(s){
 // Given raw row from sheet, calculate winner/score/sets/games
 function processMatch(raw){
   if(raw.status!=='done')
-    return{...raw,winner:null,score:null,p1sets:null,p2sets:null,p1games:null,p2games:null};
+    return{...raw,winner:null,score:null,p1sets:null,p2sets:null,p1games:null,p2games:null,retired:false};
   const s1=parseSet(raw.set1), s2=parseSet(raw.set2), tb=parseSet(raw.supertb);
   if(!s1||!s2)
-    return{...raw,winner:null,score:null,p1sets:null,p2sets:null,p1games:null,p2games:null};
-  const p1sets=(s1.a>s1.b?1:0)+(s2.a>s2.b?1:0);
-  const p2sets=(s1.b>s1.a?1:0)+(s2.b>s2.a?1:0);
+    return{...raw,winner:null,score:null,p1sets:null,p2sets:null,p1games:null,p2games:null,retired:false};
+  let p1sets=(s1.a>s1.b?1:0)+(s2.a>s2.b?1:0);
+  let p2sets=(s1.b>s1.a?1:0)+(s2.b>s2.a?1:0);
   let p1games=s1.a+s2.a, p2games=s1.b+s2.b, winner;
-  if(tb){
+  const retired=!!(raw.retiro&&raw.retiro.trim());
+  if(retired){
+    // Retiro por lesión: los sets ya completados (arriba) se mantienen tal cual
+    // para quien los ganó; solo se le fuerzan al ganador declarado los sets
+    // que quedaron sin terminar, hasta completar el partido.
+    winner=raw.retiro.trim();
+    if(winner===raw.p1){ p1sets=2; }
+    else { p2sets=2; }
+  } else if(tb){
     // super tiebreak — count tb points as games, winner decided by tb
     p1games+=tb.a; p2games+=tb.b;
     winner=tb.a>tb.b?raw.p1:raw.p2;
@@ -223,7 +243,7 @@ function processMatch(raw){
     winner=p1sets>=2?raw.p1:raw.p2;
   }
   const score=tb?`${raw.set1} / ${raw.set2} / ${raw.supertb}`:`${raw.set1} / ${raw.set2}`;
-  return{...raw,winner,score,p1sets,p2sets,p1games,p2games};
+  return{...raw,winner,score,p1sets,p2sets,p1games,p2games,retired};
 }
 
 async function loadFromSheet(){
@@ -234,6 +254,8 @@ async function loadFromSheet(){
     // Read headers from row 1, look up columns by name (order doesn't matter)
     const headers=parseCSVLine(lines[0]).map(h=>h.trim().toLowerCase());
     const col=h=>headers.indexOf(h);
+    // El encabezado de "retiro" puede traer texto extra (ej. "retiro (escribir ganador)")
+    const retiroCol=headers.findIndex(h=>h.startsWith('retiro'));
     allMatches=lines.slice(1).map(line=>{
       const c=parseCSVLine(line);
       const g=h=>{const i=col(h);return i>=0?(c[i]||'').trim():''};
@@ -243,10 +265,68 @@ async function loadFromSheet(){
         p1:g('p1'), p2:g('p2'),
         status:g('status')||'pending',
         set1:g('set1'), set2:g('set2'), supertb:g('supertb'),
+        retiro:retiroCol>=0?(c[retiroCol]||'').trim():'',
         date:g('date')||null, time:g('time')||null, venue:g('venue')||null
       });
     }).filter(Boolean);
   }catch(e){console.error('Error cargando planilla:',e);}
+}
+
+async function loadExcusas(){
+  excusasData={};
+  if(!SHEET_URL_EXCUSAS) return;
+  try{
+    const res=await fetch(SHEET_URL_EXCUSAS+'&t='+Date.now(),{cache:'no-store'});
+    const text=await res.text();
+    const lines=text.trim().split('\n');
+    const headers=parseCSVLine(lines[0]).map(h=>h.trim());
+    const col=h=>headers.indexOf(h);
+    const colJugador=col('jugador');
+    lines.slice(1).forEach(line=>{
+      const c=parseCSVLine(line);
+      const jugador=(c[colJugador]||'').trim();
+      if(!jugador) return;
+      excusasData[jugador]={};
+      MONTHS_2026.forEach(mo=>{
+        const i=col(mo.abbr);
+        const v=i>=0?(c[i]||'').trim().toUpperCase():'';
+        excusasData[jugador][mo.abbr]=(v==='TRUE'||v==='SI'||v==='SÍ'||v==='X');
+      });
+    });
+  }catch(e){console.error('Error cargando excusas:',e);}
+}
+
+// Meses ya cerrados (anteriores al mes actual) dentro de la temporada 2026
+function closedMonths(){
+  const now=new Date();
+  if(now.getFullYear()>2026) return MONTHS_2026;
+  if(now.getFullYear()<2026) return [];
+  return MONTHS_2026.filter(mo=>mo.num<(now.getMonth()+1));
+}
+
+// Nombres de mes en la fecha pueden venir como "Mar", "mar" o "marzo" — se normalizan todos a la abreviatura
+const MONTH_ALIASES={mar:'Mar',marzo:'Mar',abr:'Abr',abril:'Abr',may:'May',mayo:'May',jun:'Jun',junio:'Jun',jul:'Jul',julio:'Jul',ago:'Ago',agosto:'Ago'};
+function monthAbbrFromDate(dateStr){
+  const word=(dateStr||'').split(' ')[1];
+  if(!word) return null;
+  return MONTH_ALIASES[word.trim().toLowerCase()]||null;
+}
+
+// -2 pts por jugador y mes cerrado sin ningún partido 'done' jugado, salvo excusado
+function computePenalties(){
+  const penalties={};
+  players.forEach(p=>{penalties[p.name]=0;});
+  if(!SHEET_URL_EXCUSAS) return penalties;
+  const months=closedMonths();
+  const done=allMatches.filter(m=>m.status==='done');
+  players.forEach(p=>{
+    months.forEach(mo=>{
+      const jugoEseMes=done.some(m=>(m.p1===p.name||m.p2===p.name)&&monthAbbrFromDate(m.date)===mo.abbr);
+      const excusado=!!(excusasData[p.name]&&excusasData[p.name][mo.abbr]);
+      if(!jugoEseMes&&!excusado) penalties[p.name]+=2;
+    });
+  });
+  return penalties;
 }
 
 const basesData=[
@@ -288,7 +368,7 @@ function getPhoto(n){return PHOTOS[n]||'';}
 
 function calcStandings(){
   const s={};
-  players.forEach(p=>{s[p.name]={name:p.name,pj:0,pg:0,pp:0,sf:0,sc:0,gf:0,gc:0,pts:0};});
+  players.forEach(p=>{s[p.name]={name:p.name,pj:0,pg:0,pp:0,sf:0,sc:0,gf:0,gc:0,pts:0,san:0};});
   allMatches.filter(m=>m.status==='done').forEach(m=>{
     const loser=m.winner===m.p1?m.p2:m.p1;
     const ls=m.winner===m.p1?m.p2sets:m.p1sets;
@@ -303,6 +383,11 @@ function calcStandings(){
       s[m.p1].gf+=m.p1games; s[m.p1].gc+=m.p2games;
       s[m.p2].gf+=m.p2games; s[m.p2].gc+=m.p1games;
     }
+  });
+  const penalties=computePenalties();
+  Object.values(s).forEach(r=>{
+    r.san=penalties[r.name]||0;
+    r.pts-=r.san;
   });
   return Object.values(s).sort((a,b)=>{
     if(b.pts!==a.pts) return b.pts-a.pts;
@@ -354,7 +439,7 @@ function renderMatches(f='all'){
       </div>
       <div class="match-right">
         <span class="match-status ${m.status==='done'?'status-done':m.status==='suspended'?'status-suspended':'status-pending'}">${m.status==='done'?'Jugado':m.status==='suspended'?'⚠️ Suspendido':'Pendiente'}</span>
-        ${m.score?`<div class="match-score">${m.score}</div>`:''}
+        ${m.score?`<div class="match-score">${m.score}${m.retired?' <span title="Ganado por retiro">🩹 Retiro</span>':''}</div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -383,7 +468,7 @@ function renderResults(){
         ${meta.length?`<div class="result-meta">${meta.join(' · ')}</div>`:''}
       </div>
       <div>
-        <div class="result-score">${m.score}</div>
+        <div class="result-score">${m.score}${m.retired?' <span title="Ganado por retiro">🩹 Retiro</span>':''}</div>
         <div class="result-pts">${m.winner} +3 pts · ${loser} +${lp} pt${lp!==1?'s':''}</div>
       </div>
     </div>`;
@@ -408,6 +493,7 @@ function renderStandings(){
       <td class="td-highlight">${r.gf}</td>
       <td class="td-highlight" style="color:#aaa">${r.gc}</td>
       <td class="td-highlight"><span class="${diffClass(dg)}">${diffStr(dg)}</span></td>
+      <td>${r.san?`<span class="diff-neg">-${r.san}</span>`:'—'}</td>
       <td><span class="pts-big">${r.pts}</span></td>
     </tr>`;
   }).join('');
@@ -486,7 +572,7 @@ function renderStats(){
 async function refreshData(){
   const btn=document.getElementById('refresh-btn');
   btn.classList.add('spinning');btn.textContent='↻ Actualizando...';
-  await loadFromSheet();
+  await Promise.all([loadFromSheet(),loadExcusas()]);
   renderMatches();renderResults();renderStandings();renderStats();
   btn.classList.remove('spinning');btn.textContent='↻ Actualizar';
 }
@@ -495,7 +581,7 @@ renderPlayers();renderPrizes();renderBases();
 document.getElementById('results-list').innerHTML='<div class="loading-msg">Cargando resultados...</div>';
 document.getElementById('matches-list').innerHTML='<div class="loading-msg">Cargando partidos...</div>';
 (async()=>{
-  await loadFromSheet();
+  await Promise.all([loadFromSheet(),loadExcusas()]);
   renderMatches();renderResults();renderStandings();renderStats();
 })();
 </script>
